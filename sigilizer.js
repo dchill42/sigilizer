@@ -29,11 +29,13 @@ class Sigilizer {
   }
 
   onReady() {
-    this.logger.info(`Connected as: ${this.client.user.username} (${this.client.user.id})`);
+    this.myId = this.client.user.id;
+    this.logger.info(`Connected as: ${this.client.user.username} (${this.myId})`);
   }
 
   onMessage(msg) {
-    if (!this.mentioned(msg)) return;
+    const dm = this.messaged(msg);
+    if (!dm && !this.mentioned(msg)) return;
 
     const input = msg.content.replace(/<@![^>]*>\s*/, '');
     const base = this.digest(input);
@@ -46,12 +48,23 @@ class Sigilizer {
     layout.saveAs(path);
     this.logger.info(`Saved ${path}`);
 
-    msg.channel.send(word, { files: [path] });
+    if (dm || this.fromAdmin(msg)) return msg.channel.send(word, { files: [path] });
+
+    msg.author.send(word, { files: [path] });
+    msg.channel.send(`Sent you a DM, ${msg.author.toString()}`);
+  }
+
+  messaged(msg) {
+    return msg.channel.type == 'dm' && msg.author.id != this.myId;
   }
 
   mentioned(msg) {
-    return (msg.mentions.users.find(u => { return u.id === this.client.user.id }) ||
-      msg.mentions.roles.find(r => { return r.id === this.client.user.id }));
+    return (msg.mentions.users.find(u => { return u.id === this.myId }) ||
+      msg.mentions.roles.find(r => { return r.id === this.myId }));
+  }
+
+  fromAdmin(msg) {
+    return msg.member && msg.member.hasPermission('ADMINISTRATOR');
   }
 
   digest(input) {
